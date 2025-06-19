@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add New Appointment</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; }
+    .container { max-width: 600px; margin: 40px auto; background: #fff; border: 2px solid #2c5c5c; border-radius: 10px; padding: 30px 30px 40px 30px; }
+    h2 { color: #2c5c5c; margin-bottom: 20px; }
+    form { margin-bottom: 30px; }
+    label { display: block; margin-bottom: 6px; color: #333; }
+    select { width: 100%; padding: 10px; margin-bottom: 16px; border: 1.5px solid #2c5c5c; border-radius: 4px; font-size: 1em; }
+    button { padding: 12px 30px; background: #2c5c5c; color: #fff; border: none; border-radius: 4px; font-size: 1em; cursor: pointer; margin-top: 10px; }
+    button:hover { background: #18424b; }
+    table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+    th, td { border: 1px solid #2c5c5c; padding: 10px; text-align: left; }
+    th { background: #e0f7fa; color: #2c5c5c; }
+    caption { margin-bottom: 10px; font-weight: bold; color: #2c5c5c; }
+    .error { color: red; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Add New Appointment</h2>
+    <form id="appointmentForm">
+      <label for="time">Time</label>
+      <select id="time" required>
+        <option value="">Select a time</option>
+      </select>
+      <label for="patient_name">Name of Patient</label>
+      <select id="patient_name" required>
+        <option value="">Select a patient</option>
+      </select>
+      <button type="submit">Add Appointment</button>
+      <div class="error" id="appointmentError"></div>
+    </form>
+    <table id="appointmentsTable">
+      <caption>Current Appointments</caption>
+      <thead>
+        <tr><th>Time</th><th>Name of Patient</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <script>
+    // Function to generate time slots
+    function generateTimeSlots() {
+      const timeSelect = document.getElementById('time');
+      const startTime = new Date();
+      startTime.setHours(9, 0, 0); // 9:00 AM
+      const endTime = new Date();
+      endTime.setHours(13, 0, 0); // 1:00 PM
+
+      while (startTime <= endTime) {
+        const timeString = startTime.toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: true 
+        });
+        const option = document.createElement('option');
+        option.value = timeString;
+        option.textContent = timeString;
+        timeSelect.appendChild(option);
+        startTime.setMinutes(startTime.getMinutes() + 15);
+      }
+    }
+
+    // Function to load patients
+    async function loadPatients() {
+      const patientSelect = document.getElementById('patient_name');
+      try {
+        const res = await fetch('/patients');
+        if (res.ok) {
+          const patients = await res.json();
+          patients.forEach(patient => {
+            const option = document.createElement('option');
+            option.value = patient.name;
+            option.textContent = patient.name;
+            patientSelect.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading patients:', error);
+      }
+    }
+
+    async function loadAppointments() {
+      const tableBody = document.querySelector('#appointmentsTable tbody');
+      tableBody.innerHTML = '';
+      try {
+        const res = await fetch('/api/appointments');
+        const data = await res.json();
+        
+        if (res.ok) {
+          if (Array.isArray(data)) {
+            if (data.length === 0) {
+              const row = document.createElement('tr');
+              row.innerHTML = '<td colspan="2" style="text-align: center;">No appointments scheduled</td>';
+              tableBody.appendChild(row);
+              return;
+            }
+
+            // Sort appointments by time
+            data.sort((a, b) => {
+              const timeA = new Date(`2000/01/01 ${a.time}`);
+              const timeB = new Date(`2000/01/01 ${b.time}`);
+              return timeA - timeB;
+            });
+
+            data.forEach(a => {
+              const row = document.createElement('tr');
+              row.innerHTML = `<td>${a.time}</td><td>${a.patient_name}</td>`;
+              tableBody.appendChild(row);
+            });
+          } else {
+            throw new Error('Invalid response format');
+          }
+        } else {
+          throw new Error(data.error || 'Failed to load appointments');
+        }
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        const row = document.createElement('tr');
+        row.innerHTML = `<td colspan="2" style="text-align: center; color: red;">Error: ${error.message}</td>`;
+        tableBody.appendChild(row);
+      }
+    }
+
+    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const errorDiv = document.getElementById('appointmentError');
+      errorDiv.textContent = '';
+      
+      try {
+        const time = document.getElementById('time').value;
+        const patient_name = document.getElementById('patient_name').value;
+        
+        const res = await fetch('/api/appointments', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ time, patient_name })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          document.getElementById('appointmentForm').reset();
+          await loadAppointments();
+        } else {
+          throw new Error(data.error || 'Failed to add appointment');
+        }
+      } catch (error) {
+        console.error('Error adding appointment:', error);
+        errorDiv.textContent = error.message;
+      }
+    });
+
+    // Initialize the page
+    window.addEventListener('DOMContentLoaded', () => {
+      generateTimeSlots();
+      loadPatients();
+      loadAppointments();
+    });
+  </script>
+</body>
+</html> 

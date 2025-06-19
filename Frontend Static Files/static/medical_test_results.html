@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Results Screen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border: 3px solid #2c5f5f;
+            min-height: 600px;
+            position: relative;
+        }
+
+        .header {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-bottom: 2px solid #2c5f5f;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .logo img {
+            height: 60px;
+            width: auto;
+        }
+
+        .controls {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .patient-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .patient-selector select {
+            padding: 8px 12px;
+            border: 2px solid #2c5f5f;
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        .process-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+
+        .process-btn:hover {
+            background-color: #218838;
+        }
+
+        .process-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .content {
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            min-height: 500px;
+        }
+
+        .left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .patient-info {
+            border: 2px solid #2c5f5f;
+            padding: 20px;
+            background-color: #f8f9fa;
+            font-size: 18px;
+            font-weight: 500;
+            color: #333;
+            border-radius: 4px;
+        }
+
+        .dates-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .date-button {
+            border: 2px solid #2c5f5f;
+            padding: 15px;
+            background-color: #e9ecef;
+            font-size: 16px;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 4px;
+            text-align: left;
+        }
+
+        .date-button:hover {
+            background-color: #dee2e6;
+        }
+
+        .date-button.active {
+            background-color: #2c5f5f;
+            color: white;
+        }
+
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .files-section {
+            border: 2px solid #2c5f5f;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            min-height: 200px;
+        }
+
+        .files-section h3 {
+            margin-bottom: 15px;
+            color: #2c5f5f;
+            font-size: 18px;
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+
+        .file-type {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .download-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .download-btn:hover {
+            background-color: #0056b3;
+            text-decoration: none;
+            color: white;
+        }
+
+        .ai-response-section {
+            border: 2px solid #2c5f5f;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            min-height: 250px;
+        }
+
+        .ai-response-section h3 {
+            margin-bottom: 15px;
+            color: #2c5f5f;
+            font-size: 18px;
+        }
+
+        .ai-response-text {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            min-height: 200px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+            white-space: pre-wrap;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 40px;
+        }
+
+        .ai-avatar {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: #4a7c59;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+
+        .ai-avatar::before {
+            content: "🤖";
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+                padding: 15px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .patient-selector {
+                justify-content: space-between;
+            }
+            
+            .ai-avatar {
+                position: static;
+                margin: 20px auto 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Test Results Screen</h1>
+            <div class="logo">
+                <img src="/static/MedMaestro.png" alt="MedMaestro Logo">
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="patient-selector">
+                <label for="patientSelect">Patient:</label>
+                <select id="patientSelect">
+                    <option value="">Select a patient...</option>
+                </select>
+            </div>
+            <button id="processBtn" class="process-btn" disabled>Process Test Results</button>
+        </div>
+        
+        <div id="statusMessage" class="status-message"></div>
+        
+        <div class="content">
+            <div class="left-panel">
+                <div class="patient-info" id="patientInfo">
+                    Select a patient to view test results
+                </div>
+                
+                <div class="dates-list" id="datesList">
+                    <!-- Dates will be populated dynamically -->
+                </div>
+            </div>
+            
+            <div class="right-panel">
+                <div class="files-section">
+                    <h3>Available Files</h3>
+                    <div id="filesList" class="empty-state">
+                        Select a date to view available files
+                    </div>
+                </div>
+                
+                <div class="ai-response-section">
+                    <h3>AI Summary</h3>
+                    <div id="aiResponse" class="ai-response-text empty-state">
+                        AI summary will appear here when available
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="ai-avatar"></div>
+    </div>
+
+    <script>
+        let currentPatient = '';
+        let testResults = [];
+        let selectedDate = null;
+
+        // Load patients and initialize page
+        window.addEventListener('DOMContentLoaded', async function() {
+            await loadPatients();
+            
+            // Check if a patient was selected from another screen
+            const selectedPatient = localStorage.getItem('test_results_patient_name');
+            if (selectedPatient) {
+                const patientSelect = document.getElementById('patientSelect');
+                patientSelect.value = selectedPatient;
+                await handlePatientChange();
+            }
+        });
+
+        // Load patients into dropdown
+        async function loadPatients() {
+            try {
+                const response = await fetch('/patients');
+                if (response.ok) {
+                    const patients = await response.json();
+                    const patientSelect = document.getElementById('patientSelect');
+                    
+                    patients.forEach(patient => {
+                        const option = document.createElement('option');
+                        option.value = patient.name;
+                        option.textContent = patient.name;
+                        patientSelect.appendChild(option);
+                    });
+                } else {
+                    showStatus('Failed to load patients', 'error');
+                }
+            } catch (error) {
+                showStatus('Error loading patients: ' + error.message, 'error');
+            }
+        }
+
+        // Handle patient selection change
+        document.getElementById('patientSelect').addEventListener('change', handlePatientChange);
+
+        async function handlePatientChange() {
+            const patientSelect = document.getElementById('patientSelect');
+            currentPatient = patientSelect.value;
+            
+            if (currentPatient) {
+                document.getElementById('processBtn').disabled = false;
+                document.getElementById('patientInfo').textContent = `Test results - ${currentPatient}`;
+                await loadTestResults();
+            } else {
+                document.getElementById('processBtn').disabled = true;
+                document.getElementById('patientInfo').textContent = 'Select a patient to view test results';
+                clearResults();
+            }
+        }
+
+        // Load test results for selected patient
+        async function loadTestResults() {
+            try {
+                showStatus('Loading test results...', 'info');
+                
+                const response = await fetch(`/api/patient-test-results?name=${encodeURIComponent(currentPatient)}`);
+                if (response.ok) {
+                    testResults = await response.json();
+                    displayDates();
+                    hideStatus();
+                } else {
+                    const error = await response.json();
+                    showStatus(error.error || 'Failed to load test results', 'error');
+                }
+            } catch (error) {
+                showStatus('Error loading test results: ' + error.message, 'error');
+            }
+        }
+
+        // Display available dates
+        function displayDates() {
+            const datesList = document.getElementById('datesList');
+            datesList.innerHTML = '';
+            
+            if (testResults.length === 0) {
+                datesList.innerHTML = '<div class="empty-state">No test results found</div>';
+                return;
+            }
+            
+            testResults.forEach((result, index) => {
+                const dateButton = document.createElement('div');
+                dateButton.className = 'date-button';
+                dateButton.textContent = result.date;
+                dateButton.addEventListener('click', () => selectDate(index));
+                datesList.appendChild(dateButton);
+            });
+            
+            // Auto-select first date if available
+            if (testResults.length > 0) {
+                selectDate(0);
+            }
+        }
+
+        // Select a date and display its files
+        function selectDate(index) {
+            selectedDate = index;
+            
+            // Update active date button
+            document.querySelectorAll('.date-button').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+            
+            displayFiles();
+            displayAIResponse();
+        }
+
+        // Display files for selected date
+        function displayFiles() {
+            const filesList = document.getElementById('filesList');
+            
+            if (selectedDate === null || !testResults[selectedDate]) {
+                filesList.innerHTML = '<div class="empty-state">Select a date to view available files</div>';
+                return;
+            }
+            
+            const result = testResults[selectedDate];
+            
+            if (result.files.length === 0) {
+                filesList.innerHTML = '<div class="empty-state">No files available for this date</div>';
+                return;
+            }
+            
+            filesList.innerHTML = '<div class="file-list"></div>';
+            const fileListContainer = filesList.querySelector('.file-list');
+            
+            result.files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <span class="file-type">${file.type}</span>
+                    <a href="${file.download_url}" class="download-btn" download="${file.filename}">
+                        Download ${file.filename}
+                    </a>
+                `;
+                fileListContainer.appendChild(fileItem);
+            });
+        }
+
+        // Display AI response for selected date
+        function displayAIResponse() {
+            const aiResponse = document.getElementById('aiResponse');
+            
+            if (selectedDate === null || !testResults[selectedDate]) {
+                aiResponse.textContent = 'AI summary will appear here when available';
+                aiResponse.className = 'ai-response-text empty-state';
+                return;
+            }
+            
+            const result = testResults[selectedDate];
+            
+            if (result.llm_summary) {
+                aiResponse.textContent = result.llm_summary;
+                aiResponse.className = 'ai-response-text';
+            } else {
+                aiResponse.textContent = 'No AI summary available for this date';
+                aiResponse.className = 'ai-response-text empty-state';
+            }
+        }
+
+        // Process test results button
+        document.getElementById('processBtn').addEventListener('click', async function() {
+            if (!currentPatient) return;
+            
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            
+            try {
+                showStatus('Triggering backend processing...', 'info');
+                
+                const response = await fetch('/api/trigger-backend', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ patient_name: currentPatient })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus('Backend processing completed successfully!', 'success');
+                    // Reload test results to show updated data
+                    await loadTestResults();
+                } else {
+                    showStatus(result.error || 'Backend processing failed', 'error');
+                }
+            } catch (error) {
+                showStatus('Error triggering backend: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Process Test Results';
+            }
+        });
+
+        // Utility functions
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message status-${type}`;
+            statusEl.style.display = 'block';
+        }
+
+        function hideStatus() {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.style.display = 'none';
+        }
+
+        function clearResults() {
+            testResults = [];
+            selectedDate = null;
+            document.getElementById('datesList').innerHTML = '';
+            document.getElementById('filesList').innerHTML = '<div class="empty-state">Select a date to view available files</div>';
+            document.getElementById('aiResponse').innerHTML = '<div class="empty-state">AI summary will appear here when available</div>';
+        }
+    </script>
+</body>
+</html>
