@@ -8,7 +8,7 @@ import os
 import json
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app)
 
 # --- SQLite Setup ---
@@ -303,6 +303,8 @@ def update_llm_server_ip():
 @app.route('/chatbot')
 def chatbot():
     return app.send_static_file('chatbot.html')
+
+
 
 # New endpoint to trigger backend processing
 @app.route('/api/trigger-backend', methods=['POST'])

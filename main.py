@@ -89,7 +89,7 @@ def update_frontend_database(patient_name: str):
                     "date_processed": record.get('created_at', datetime.now()).strftime('%Y-%m-%d'),
                     "request_id": record.get('request_id', ''),
                     "test_type": record.get('test_type', 'Unknown'),
-                    "llm_summary": record.get('llm_analysis', record.get('test_summary', '')),
+                    "llm_summary": record.get('llm_analysis', ''),  # Only use LLM analysis, not test_summary
                     "extracted_text": record.get('extracted_text', ''),
                     "created_at": datetime.now(),
                     "source": "gmail_processor"

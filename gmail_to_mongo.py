@@ -284,6 +284,11 @@ class GmailToMongoProcessor:
                     {"_id": ObjectId(mongo_result['record_id'])},
                     {"$set": {"test_summary": test_summary}}
                 )
+                
+                # Check for duplicate records and trigger LLM processing if needed
+                if mongo_result.get('is_duplicate'):
+                    logger.info(f"         🔄 Duplicate record detected - checking for LLM processing...")
+                    self.handle_duplicate_record(mongo_result['record_id'], request_id, patient_name)
             
             logger.info(f"         ✅ MongoDB: Record {mongo_result['action']} (ID: {mongo_result['record_id']})")
             
@@ -308,9 +313,10 @@ class GmailToMongoProcessor:
             }
 
     def handle_duplicate_record(self, record_id: str, request_id: str, patient_name: str):
-        """Handle duplicate records - check if we have both Blood Work and CT Scan"""
+        """Handle duplicate records - check if we have multiple test results for LLM analysis"""
         try:
             from bson import ObjectId
+            from datetime import datetime
             
             # Get the updated record from MongoDB
             record = self.medical_record.collection.find_one({"_id": ObjectId(record_id)})
@@ -341,25 +347,55 @@ class GmailToMongoProcessor:
             for i, record_info in enumerate(test_records, 1):
                 logger.info(f"            {i}. {record_info['test_type']} - {len(record_info['test_summary'])} characters")
             
-            # Check if we have both Blood Work and CT Scan
-            blood_records = [r for r in test_records if r['test_type'] == 'Blood Work']
-            ct_records = [r for r in test_records if r['test_type'] == 'CT Scan']
-            
-            if blood_records and ct_records:
-                logger.info(f"         🎯 Both Blood Work and CT Scan detected - preparing LLM prompt!")
+            # Check if we have multiple test results (2 or more)
+            if len(test_records) >= 2:
+                logger.info(f"         🎯 Multiple test results detected - preparing LLM prompt!")
                 
-                # Use the first record of each type (in case there are multiple)
-                blood_summary = blood_records[0]['test_summary']
-                ct_summary = ct_records[0]['test_summary']
+                # Check for specific combinations first (Blood Work + CT Scan)
+                blood_records = [r for r in test_records if r['test_type'] == 'Blood Work']
+                ct_records = [r for r in test_records if r['test_type'] == 'CT Scan']
                 
-                # Generate and print the LLM prompt
-                self.generate_and_print_llm_prompt(
-                    request_id, patient_name, 'Blood Work', blood_summary, 'CT Scan', ct_summary
-                )
+                if blood_records and ct_records:
+                    # Use the first record of each type
+                    blood_summary = blood_records[0]['test_summary']
+                    ct_summary = ct_records[0]['test_summary']
+                    
+                    # Generate and call LLM API
+                    llm_response = self.generate_and_call_llm_api(
+                        request_id, patient_name, 'Blood Work', blood_summary, 'CT Scan', ct_summary
+                    )
+                    
+                    # Save LLM response to the record
+                    if llm_response:
+                        self.medical_record.collection.update_one(
+                            {"_id": ObjectId(record_id)},
+                            {"$set": {"llm_analysis": llm_response, "analysis_completed_at": datetime.now()}}
+                        )
+                        logger.info(f"         ✅ LLM analysis saved to record!")
+                    
+                else:
+                    # Handle other combinations - use first two test results
+                    test1 = test_records[0]
+                    test2 = test_records[1]
+                    
+                    logger.info(f"         🎯 Analyzing {test1['test_type']} + {test2['test_type']}")
+                    
+                    # Generate and call LLM API
+                    llm_response = self.generate_and_call_llm_api(
+                        request_id, patient_name, 
+                        test1['test_type'], test1['test_summary'],
+                        test2['test_type'], test2['test_summary']
+                    )
+                    
+                    # Save LLM response to the record
+                    if llm_response:
+                        self.medical_record.collection.update_one(
+                            {"_id": ObjectId(record_id)},
+                            {"$set": {"llm_analysis": llm_response, "analysis_completed_at": datetime.now()}}
+                        )
+                        logger.info(f"         ✅ LLM analysis saved to record!")
             else:
-                logger.info(f"         ℹ️ Missing required test types - no LLM analysis needed")
-                logger.info(f"            Blood Work records: {len(blood_records)}")
-                logger.info(f"            CT Scan records: {len(ct_records)}")
+                logger.info(f"         ℹ️ Only {len(test_records)} test result(s) - no LLM analysis needed")
                 
         except Exception as e:
             logger.error(f"         ❌ Error handling duplicate record: {str(e)}")
@@ -383,7 +419,7 @@ class GmailToMongoProcessor:
         
         return 'Unknown'
 
-    def generate_and_print_llm_prompt(
+    def generate_and_call_llm_api(
         self, 
         request_id: str, 
         patient_name: str, 
@@ -391,17 +427,18 @@ class GmailToMongoProcessor:
         test_summary_1: str, 
         test_type_2: str,
         test_summary_2: str
-    ):
-        """Generate and print the LLM prompt for review, then call LLM API"""
+    ) -> str:
+        """Generate LLM prompt and call API, return the response"""
         
         logger.info(f"\n" + "=" * 70)
-        logger.info(f"🤖 LLM PROMPT GENERATED FOR REVIEW")
+        logger.info(f"🤖 LLM ANALYSIS STARTING")
         logger.info(f"=" * 70)
         logger.info(f"Request ID: {request_id}")
         logger.info(f"Patient: {patient_name}")
+        logger.info(f"Test Types: {test_type_1} + {test_type_2}")
         logger.info(f"=" * 70)
         
-        # Build the user content in the new format you requested
+        # Build the user content with the test results
         user_content = f"Record 1 - {test_type_1} - {test_summary_1}\n\nRecord 2 - {test_type_2} - {test_summary_2}"
         
         # Build the complete prompt structure
@@ -409,7 +446,7 @@ class GmailToMongoProcessor:
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a helpful medical assistant to a medical professional. Provide detailed responses to the questions that are asked of you. The upcoming text is a combination of results from a Blood test report and a CT scan. I want you to use your deep medical knowledge to help diagnose the patient's condition based on the information in the reports"
+                    "content": f"You are a helpful medical assistant to a medical professional. Provide detailed responses to the questions that are asked of you. The upcoming text is a combination of results from a {test_type_1} report and a {test_type_2} report. I want you to use your deep medical knowledge to help diagnose the patient's condition based on the information in the reports"
                 },
                 {
                     "role": "user",
@@ -422,50 +459,20 @@ class GmailToMongoProcessor:
             "repetition_penalty": 1.1
         }
         
-        # Print the prompt structure for review
-        print("\n🔍 SYSTEM PROMPT:")
-        print(f"   {prompt_structure['messages'][0]['content']}")
-        
-        print("\n🔍 USER PROMPT:")
-        print(f"   {prompt_structure['messages'][1]['content']}")
-        
         # Get the actual server URL from config
         from config import Config
         server_url = f"{Config.SELF_HOSTED_LLM_URL}:{Config.SELF_HOSTED_LLM_PORT}"
         
-        print("\n🔍 FULL CURL COMMAND:")
-        print(f"curl -X POST \"{server_url}/v1/chat/completions\" \\")
-        print(f"  -H \"Content-Type: application/json\" \\")
-        print(f"  -H \"Accept: application/json\" \\")
-        print(f"  -d '{{\n    \"messages\": [")
-        print(f"      {{")
-        print(f"        \"role\": \"system\",")
-        print(f"        \"content\": \"{prompt_structure['messages'][0]['content']}\"")
-        print(f"      }},")
-        print(f"      {{")
-        print(f"        \"role\": \"user\",")
-        print(f"        \"content\": \"{prompt_structure['messages'][1]['content']}\"")
-        print(f"      }}")
-        print(f"    ],")
-        print(f"    \"max_tokens\": 1000,")
-        print(f"    \"temperature\": 0.7,")
-        print(f"    \"top_p\": 0.9,")
-        print(f"    \"repetition_penalty\": 1.1")
-        print(f"  }}'")
+        logger.info(f"🚀 Calling LLM API at {server_url}...")
         
-        logger.info(f"=" * 70)
-        logger.info(f"📝 PROMPT READY FOR REVIEW - Check the output above!")
-        logger.info(f"=" * 70)
-        
-        # Now make the actual LLM API call
-        self.call_llm_api(prompt_structure, server_url, request_id, patient_name)
+        # Make the actual LLM API call and return response
+        return self.call_llm_api(prompt_structure, server_url, request_id, patient_name)
 
-    def call_llm_api(self, prompt_structure: dict, server_url: str, request_id: str, patient_name: str):
-        """Make the actual LLM API call and display response"""
+    def call_llm_api(self, prompt_structure: dict, server_url: str, request_id: str, patient_name: str) -> str:
+        """Make the actual LLM API call and return response"""
         
         try:
-            logger.info(f"\n🚀 CALLING LLM API...")
-            logger.info(f"   Server: {server_url}")
+            logger.info(f"   🌐 Making API request to {server_url}...")
             
             # Make the API call
             response = requests.post(
@@ -486,10 +493,11 @@ class GmailToMongoProcessor:
                     llm_response = response_data['choices'][0]['message']['content'].strip()
                     
                     logger.info(f"\n" + "=" * 70)
-                    logger.info(f"🎯 LLM RESPONSE")
+                    logger.info(f"🎯 LLM RESPONSE RECEIVED")
                     logger.info(f"=" * 70)
                     logger.info(f"Request ID: {request_id}")
                     logger.info(f"Patient: {patient_name}")
+                    logger.info(f"Response Length: {len(llm_response)} characters")
                     logger.info(f"=" * 70)
                     
                     print(f"\n🤖 LLM ANALYSIS:")
@@ -499,22 +507,29 @@ class GmailToMongoProcessor:
                     logger.info(f"✅ LLM analysis completed successfully!")
                     logger.info(f"=" * 70)
                     
+                    return llm_response
+                    
                 else:
                     logger.error(f"❌ Unexpected response format: {response_data}")
+                    return ""
                     
             else:
                 logger.error(f"❌ LLM API call failed: HTTP {response.status_code}")
                 logger.error(f"   Response: {response.text}")
+                return ""
                 
         except requests.exceptions.Timeout:
             logger.error(f"❌ LLM API call timed out after 60 seconds")
+            return ""
             
         except requests.exceptions.ConnectionError:
             logger.error(f"❌ Could not connect to LLM server at {server_url}")
             logger.error(f"   Make sure your LLM server is running and accessible")
+            return ""
             
         except Exception as e:
             logger.error(f"❌ LLM API call failed: {str(e)}")
+            return ""
 
     def print_processing_summary(self, stats: Dict[str, int]):
         """Print processing summary"""
